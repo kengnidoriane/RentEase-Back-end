@@ -1,0 +1,146 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                     String                  @id @default(cuid())
+  email                  String                  @unique
+  password               String
+  firstName              String
+  lastName               String
+  phone                  String
+  userType               UserType
+  profilePicture         String?
+  isVerified             Boolean                 @default(false)
+  isActive               Boolean                 @default(true)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  
+  properties             Property[]
+  sentMessages           Message[]               @relation("MessageSender")
+  receivedMessages       Message[]               @relation("MessageReceiver")
+  favorites              Favorite[]
+  verificationDocuments  VerificationDocument[]
+  
+  @@map("users")
+}
+
+model Property {
+  id                 String            @id @default(cuid())
+  title              String
+  description        String
+  price              Decimal
+  currency           String            @default("EUR")
+  propertyType       PropertyType
+  bedrooms           Int
+  bathrooms          Int
+  area               Decimal
+  address            String
+  city               String
+  latitude           Decimal
+  longitude          Decimal
+  isVerified         Boolean           @default(false)
+  isActive           Boolean           @default(true)
+  verificationStatus VerificationStatus @default(PENDING)
+  rejectionReason    String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  
+  landlordId         String
+  landlord           User              @relation(fields: [landlordId], references: [id])
+  images             PropertyImage[]
+  favorites          Favorite[]
+  messages           Message[]
+  
+  @@map("properties")
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  content        String
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  conversationId String
+  
+  senderId       String
+  sender         User     @relation("MessageSender", fields: [senderId], references: [id])
+  receiverId     String
+  receiver       User     @relation("MessageReceiver", fields: [receiverId], references: [id])
+  propertyId     String
+  property       Property @relation(fields: [propertyId], references: [id])
+  
+  @@map("messages")
+}
+
+model Favorite {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id])
+  
+  @@unique([userId, propertyId])
+  @@map("favorites")
+}
+
+model PropertyImage {
+  id         String   @id @default(cuid())
+  url        String
+  altText    String
+  order      Int
+  
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id])
+  
+  @@map("property_images")
+}
+
+model VerificationDocument {
+  id              String            @id @default(cuid())
+  documentType    DocumentType
+  documentUrl     String
+  status          VerificationStatus @default(PENDING)
+  rejectionReason String?
+  uploadedAt      DateTime          @default(now())
+  reviewedAt      DateTime?
+  
+  userId          String
+  user            User              @relation(fields: [userId], references: [id])
+  
+  @@map("verification_documents")
+}
+
+enum UserType {
+  TENANT
+  LANDLORD
+  ADMIN
+}
+
+enum PropertyType {
+  APARTMENT
+  ROOM
+  HOUSE
+  STUDIO
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum DocumentType {
+  ID
+  PROPERTY_OWNERSHIP
+  PROOF_OF_ADDRESS
+}
