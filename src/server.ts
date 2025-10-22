@@ -47,7 +47,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.status(200).json({
     success: true,
     message: 'RentEase API is running',
@@ -56,14 +56,24 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API routes will be added here
-app.get('/api', (req, res) => {
+// Import routes
+import authRoutes from '@/routes/auth.routes';
+import userRoutes from '@/routes/user.routes';
+import adminRoutes from '@/routes/admin.routes';
+
+// API routes
+app.get('/api', (_req, res) => {
   res.status(200).json({
     success: true,
     message: 'Welcome to RentEase API',
     version: '1.0.0',
   });
 });
+
+// Mount routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);

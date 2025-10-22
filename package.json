@@ -20,7 +20,13 @@
     "db:studio": "prisma studio",
     "prepare": "husky install"
   },
-  "keywords": ["rental", "housing", "api", "nodejs", "typescript"],
+  "keywords": [
+    "rental",
+    "housing",
+    "api",
+    "nodejs",
+    "typescript"
+  ],
   "author": "RentEase Team",
   "license": "MIT",
   "dependencies": {
