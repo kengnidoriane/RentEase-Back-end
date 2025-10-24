@@ -1,56 +1,41 @@
-import { PrismaClient } from '@prisma/client';
-import { execSync } from 'child_process';
-import { redisClient } from '@/config/redis';
+// Mock Redis service for tests
+jest.mock('@/services/redis.service', () => ({
+  RedisService: jest.fn().mockImplementation(() => ({
+    storeEmailVerificationToken: jest.fn().mockResolvedValue(undefined),
+    getEmailFromVerificationToken: jest.fn().mockResolvedValue('test@example.com'),
+    storePasswordResetToken: jest.fn().mockResolvedValue(undefined),
+    getEmailFromResetToken: jest.fn().mockResolvedValue('test@example.com'),
+    storeRefreshToken: jest.fn().mockResolvedValue(undefined),
+    getRefreshToken: jest.fn().mockResolvedValue('refresh-token'),
+    deleteRefreshToken: jest.fn().mockResolvedValue(undefined),
+    blacklistAccessToken: jest.fn().mockResolvedValue(undefined),
+    isTokenBlacklisted: jest.fn().mockResolvedValue(false),
+    flushAll: jest.fn().mockResolvedValue(undefined),
+  })),
+}));
 
-// Test database instance
-export const testPrisma = new PrismaClient({
-  datasources: {
-    db: {
-      url:
-        process.env['DATABASE_URL_TEST'] ||
-        'postgresql://username:password@localhost:5432/rentease_test?schema=public',
-    },
+// Mock database config
+jest.mock('@/config/database', () => ({
+  connectDatabase: jest.fn().mockResolvedValue(undefined),
+  disconnectDatabase: jest.fn().mockResolvedValue(undefined),
+}));
+
+// Mock Redis config
+jest.mock('@/config/redis', () => ({
+  connectRedis: jest.fn().mockResolvedValue(undefined),
+  disconnectRedis: jest.fn().mockResolvedValue(undefined),
+  redisClient: {
+    isOpen: false,
+    connect: jest.fn().mockResolvedValue(undefined),
+    select: jest.fn().mockResolvedValue(undefined),
+    flushDb: jest.fn().mockResolvedValue(undefined),
+    quit: jest.fn().mockResolvedValue(undefined),
   },
-});
+}));
 
-beforeAll(async () => {
-  // Set test environment
-  process.env['NODE_ENV'] = 'test';
-
-  // Connect to test database
-  await testPrisma.$connect();
-
-  // Run migrations on test database
-  execSync('npx prisma migrate deploy', {
-    env: { ...process.env, DATABASE_URL: process.env['DATABASE_URL_TEST'] },
-  });
-
-  // Connect to Redis (use different DB for tests)
-  if (!redisClient.isOpen) {
-    await redisClient.connect();
-    await redisClient.select(1); // Use DB 1 for tests
-  }
-});
-
-beforeEach(async () => {
-  // Clean up database before each test
-  await testPrisma.verificationDocument.deleteMany();
-  await testPrisma.propertyImage.deleteMany();
-  await testPrisma.favorite.deleteMany();
-  await testPrisma.message.deleteMany();
-  await testPrisma.property.deleteMany();
-  await testPrisma.user.deleteMany();
-
-  // Clear Redis cache
-  await redisClient.flushDb();
-});
-
-afterAll(async () => {
-  // Disconnect from test database
-  await testPrisma.$disconnect();
-
-  // Disconnect from Redis
-  if (redisClient.isOpen) {
-    await redisClient.quit();
-  }
-});
+// Set test environment
+process.env.NODE_ENV = 'test';
+process.env.JWT_SECRET = 'test-jwt-secret';
+process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
+process.env.JWT_EXPIRES_IN = '15m';
+process.env.JWT_REFRESH_EXPIRES_IN = '7d';

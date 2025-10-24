@@ -2,6 +2,7 @@ import { User, UserType } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 export interface CreateUserData {
+  id?: string;
   email?: string;
   password?: string;
   firstName?: string;
@@ -14,7 +15,8 @@ export interface CreateUserData {
 
 export const createUserData = (
   overrides: CreateUserData = {}
-): Omit<User, 'id' | 'createdAt' | 'updatedAt'> => ({
+): Omit<User, 'createdAt' | 'updatedAt'> => ({
+  id: overrides.id || `user-${Date.now()}`,
   email: overrides.email || `test${Date.now()}@example.com`,
   password: overrides.password || 'hashedPassword123',
   firstName: overrides.firstName || 'John',
@@ -32,7 +34,7 @@ export const createHashedPassword = async (password: string = 'password123'): Pr
 
 export const createTenantData = (
   overrides: CreateUserData = {}
-): Omit<User, 'id' | 'createdAt' | 'updatedAt'> => {
+): Omit<User, 'createdAt' | 'updatedAt'> => {
   return createUserData({
     userType: UserType.TENANT,
     ...overrides,
@@ -41,7 +43,7 @@ export const createTenantData = (
 
 export const createLandlordData = (
   overrides: CreateUserData = {}
-): Omit<User, 'id' | 'createdAt' | 'updatedAt'> => {
+): Omit<User, 'createdAt' | 'updatedAt'> => {
   return createUserData({
     userType: UserType.LANDLORD,
     ...overrides,
@@ -50,7 +52,7 @@ export const createLandlordData = (
 
 export const createAdminData = (
   overrides: CreateUserData = {}
-): Omit<User, 'id' | 'createdAt' | 'updatedAt'> => {
+): Omit<User, 'createdAt' | 'updatedAt'> => {
   return createUserData({
     userType: UserType.ADMIN,
     ...overrides,

@@ -29,7 +29,7 @@ export const generateTestToken = (userId: string, userType: UserType = UserType.
 };
 
 export const createAuthenticatedRequest = (
-  user: Partial<User>,
+  user: Partial<User> & { userId?: string; userType?: string },
   overrides: Partial<Request> = {}
 ): Partial<Request> => {
   const token = generateTestToken(user.id || 'test-id', user.userType || UserType.TENANT);
@@ -37,7 +37,12 @@ export const createAuthenticatedRequest = (
     headers: {
       authorization: `Bearer ${token}`,
     },
-    user,
+    user: {
+      userId: user.id || user.userId || 'test-id',
+      email: user.email || 'test@example.com',
+      userType: user.userType || UserType.TENANT,
+      id: user.id || user.userId || 'test-id',
+    },
     ...overrides,
   });
 };

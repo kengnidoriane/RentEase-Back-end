@@ -1,13 +1,6 @@
-// Simple test setup without external dependencies
-beforeAll(async () => {
-  // Set test environment
-  process.env['NODE_ENV'] = 'test';
-});
-
-beforeEach(async () => {
-  // Setup for each test
-});
-
-afterAll(async () => {
-  // Cleanup after all tests
-});
+// Set test environment variables
+process.env.NODE_ENV = 'test';
+process.env.JWT_SECRET = 'test-jwt-secret';
+process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
+process.env.JWT_EXPIRES_IN = '15m';
+process.env.JWT_REFRESH_EXPIRES_IN = '7d';
