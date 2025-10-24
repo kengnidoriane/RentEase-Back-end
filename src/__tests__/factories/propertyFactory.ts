@@ -1,6 +1,7 @@
-import { Property, PropertyType, VerificationStatus } from '@prisma/client';
+import { PropertyType, VerificationStatus, Prisma } from '@prisma/client';
 
 export interface CreatePropertyData {
+  id?: string;
   title?: string;
   description?: string;
   price?: number;
@@ -17,34 +18,38 @@ export interface CreatePropertyData {
   isVerified?: boolean;
   isActive?: boolean;
   verificationStatus?: VerificationStatus;
+  rejectionReason?: string | null;
 }
 
 export const createPropertyData = (
   overrides: CreatePropertyData = {}
-): Omit<Property, 'id' | 'createdAt' | 'updatedAt'> => ({
+): any => ({
+  id: overrides.id || 'property-123',
   title: overrides.title || 'Beautiful Apartment in City Center',
   description:
     overrides.description || 'A lovely apartment with modern amenities and great location.',
-  price: overrides.price || 1200,
+  price: new Prisma.Decimal(overrides.price || 1200),
   currency: overrides.currency || 'EUR',
   propertyType: overrides.propertyType || PropertyType.APARTMENT,
   bedrooms: overrides.bedrooms || 2,
   bathrooms: overrides.bathrooms || 1,
-  area: overrides.area || 75,
+  area: new Prisma.Decimal(overrides.area || 75),
   address: overrides.address || '123 Main Street',
   city: overrides.city || 'Paris',
-  latitude: overrides.latitude || 48.8566,
-  longitude: overrides.longitude || 2.3522,
+  latitude: new Prisma.Decimal(overrides.latitude || 48.8566),
+  longitude: new Prisma.Decimal(overrides.longitude || 2.3522),
   landlordId: overrides.landlordId || 'landlord-id',
   isVerified: overrides.isVerified ?? false,
   isActive: overrides.isActive ?? true,
   verificationStatus: overrides.verificationStatus || VerificationStatus.PENDING,
-  rejectionReason: null,
+  rejectionReason: overrides.rejectionReason ?? null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
 });
 
 export const createVerifiedPropertyData = (
   overrides: CreatePropertyData = {}
-): Omit<Property, 'id' | 'createdAt' | 'updatedAt'> => {
+): any => {
   return createPropertyData({
     isVerified: true,
     verificationStatus: VerificationStatus.APPROVED,

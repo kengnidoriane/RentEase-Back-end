@@ -248,7 +248,7 @@ export class PropertyService {
       take: 1,
     });
 
-    const startOrder = currentImages.length > 0 ? currentImages[0].order + 1 : 1;
+    const startOrder = currentImages.length > 0 ? currentImages[0]!.order + 1 : 1;
 
     // Add new images
     const imageData = images.map((image, index) => ({
