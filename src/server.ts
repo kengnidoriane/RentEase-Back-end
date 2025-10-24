@@ -3,16 +3,22 @@ import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
 import { connectDatabase, disconnectDatabase } from '@/config/database';
 import { connectRedis, disconnectRedis } from '@/config/redis';
 import { logger } from '@/utils/logger';
 import { errorHandler } from '@/middleware/error.middleware';
+import { WebSocketService } from '@/services/websocket.service';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 3000;
+
+// Initialize WebSocket service
+let webSocketService: WebSocketService | undefined;
 
 // Security middleware
 app.use(
@@ -61,6 +67,7 @@ import authRoutes from '@/routes/auth.routes';
 import userRoutes from '@/routes/user.routes';
 import adminRoutes from '@/routes/admin.routes';
 import propertyRoutes from '@/routes/property.routes';
+import messageRoutes from '@/routes/message.routes';
 
 // API routes
 app.get('/api', (_req, res) => {
@@ -76,6 +83,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/properties', propertyRoutes);
+app.use('/api/messages', messageRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
@@ -118,10 +126,14 @@ const startServer = async () => {
     await connectDatabase();
     await connectRedis();
 
-    app.listen(PORT, () => {
+    // Initialize WebSocket service
+    webSocketService = new WebSocketService(server);
+
+    server.listen(PORT, () => {
       logger.info(`🚀 Server running on port ${PORT}`);
       logger.info(`📚 Health check: http://localhost:${PORT}/health`);
       logger.info(`🔗 API endpoint: http://localhost:${PORT}/api`);
+      logger.info(`🔌 WebSocket server initialized`);
     });
   } catch (error) {
     logger.error('❌ Failed to start server:', error);

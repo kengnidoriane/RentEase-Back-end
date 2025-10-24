@@ -47,6 +47,9 @@ export const createPropertyData = (
   updatedAt: new Date(),
 });
 
+// Alias for backward compatibility
+export const createTestProperty = createPropertyData;
+
 export const createVerifiedPropertyData = (
   overrides: CreatePropertyData = {}
 ): any => {

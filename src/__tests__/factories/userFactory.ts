@@ -28,6 +28,9 @@ export const createUserData = (
   isActive: overrides.isActive ?? true,
 });
 
+// Alias for backward compatibility
+export const createTestUser = createUserData;
+
 export const createHashedPassword = async (password: string = 'password123'): Promise<string> => {
   return bcrypt.hash(password, 12);
 };
