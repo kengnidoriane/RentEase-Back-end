@@ -1,10 +1,15 @@
 import request from 'supertest';
 import { PrismaClient } from '@prisma/client';
+import { Server } from 'http';
+import { io as Client, Socket } from 'socket.io-client';
 import app from '../../server';
-import { createTestUser, createTestProperty } from '../factories/userFactory';
+import { createTestUser } from '../factories/userFactory';
+import { createTestProperty } from '../factories/propertyFactory';
 import jwt from 'jsonwebtoken';
 
 const prisma = new PrismaClient();
+let server: Server;
+let clientSocket: Socket;
 
 describe('Message Integration Tests', () => {
   let sender: any;
@@ -14,6 +19,11 @@ describe('Message Integration Tests', () => {
   let receiverToken: string;
 
   beforeAll(async () => {
+    // Start the server
+    server = app.listen(0); // Use port 0 to get a random available port
+    const address = server.address();
+    const port = typeof address === 'string' ? address : address?.port;
+
     // Clean up database
     await prisma.message.deleteMany();
     await prisma.property.deleteMany();
@@ -57,10 +67,33 @@ describe('Message Integration Tests', () => {
       process.env.JWT_SECRET!,
       { expiresIn: '1h' }
     );
+
+    // Create WebSocket client for testing
+    clientSocket = Client(`http://localhost:${port}`, {
+      auth: {
+        token: senderToken,
+      },
+      transports: ['websocket'],
+    });
+
+    // Wait for connection
+    await new Promise<void>((resolve) => {
+      clientSocket.on('connect', resolve);
+    });
   });
 
   afterAll(async () => {
-    // Clean up
+    // Clean up WebSocket connection
+    if (clientSocket) {
+      clientSocket.disconnect();
+    }
+
+    // Close server
+    if (server) {
+      server.close();
+    }
+
+    // Clean up database
     await prisma.message.deleteMany();
     await prisma.property.deleteMany();
     await prisma.user.deleteMany();
@@ -339,6 +372,356 @@ describe('Message Integration Tests', () => {
 
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('UNAUTHORIZED');
+    });
+  });
+
+  describe('WebSocket Real-time Messaging', () => {
+    let receiverSocket: Socket;
+    let conversationId: string;
+
+    beforeEach(async () => {
+      // Create receiver socket
+      const address = server.address();
+      const port = typeof address === 'string' ? address : address?.port;
+      
+      receiverSocket = Client(`http://localhost:${port}`, {
+        auth: {
+          token: receiverToken,
+        },
+        transports: ['websocket'],
+      });
+
+      // Wait for receiver connection
+      await new Promise<void>((resolve) => {
+        receiverSocket.on('connect', resolve);
+      });
+
+      // Generate conversation ID
+      conversationId = `${sender.id}_${receiver.id}_${property.id}`;
+
+      // Both users join the conversation
+      clientSocket.emit('join_conversation', conversationId);
+      receiverSocket.emit('join_conversation', conversationId);
+
+      // Wait a bit for join operations to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+    });
+
+    afterEach(() => {
+      if (receiverSocket) {
+        receiverSocket.disconnect();
+      }
+    });
+
+    it('should establish WebSocket connection with authentication', (done) => {
+      expect(clientSocket.connected).toBe(true);
+      expect(receiverSocket.connected).toBe(true);
+      done();
+    });
+
+    it('should reject WebSocket connection without valid token', (done) => {
+      const address = server.address();
+      const port = typeof address === 'string' ? address : address?.port;
+      
+      const unauthorizedSocket = Client(`http://localhost:${port}`, {
+        auth: {
+          token: 'invalid-token',
+        },
+        transports: ['websocket'],
+      });
+
+      unauthorizedSocket.on('connect_error', (error) => {
+        expect(error.message).toContain('Authentication failed');
+        unauthorizedSocket.disconnect();
+        done();
+      });
+
+      // If it connects (which it shouldn't), fail the test
+      unauthorizedSocket.on('connect', () => {
+        unauthorizedSocket.disconnect();
+        done(new Error('Should not have connected with invalid token'));
+      });
+    });
+
+    it('should allow users to join conversations they participate in', (done) => {
+      let joinedCount = 0;
+
+      const checkJoined = () => {
+        joinedCount++;
+        if (joinedCount === 2) {
+          done();
+        }
+      };
+
+      // Listen for successful joins (no error events)
+      clientSocket.emit('join_conversation', conversationId);
+      receiverSocket.emit('join_conversation', conversationId);
+
+      // If no errors after a short delay, consider it successful
+      setTimeout(checkJoined, 100);
+      setTimeout(checkJoined, 100);
+    });
+
+    it('should reject users from joining conversations they do not participate in', (done) => {
+      const unauthorizedConversationId = 'unauthorized_conversation_id';
+
+      clientSocket.on('error', (error) => {
+        expect(error.message).toBe('Access denied to conversation');
+        done();
+      });
+
+      clientSocket.emit('join_conversation', unauthorizedConversationId);
+    });
+
+    it('should broadcast new messages to conversation participants', (done) => {
+      const messageData = {
+        conversationId,
+        content: 'Hello from WebSocket test',
+        propertyId: property.id,
+      };
+
+      receiverSocket.on('new_message', (receivedMessage) => {
+        expect(receivedMessage.content).toBe(messageData.content);
+        expect(receivedMessage.conversationId).toBe(conversationId);
+        expect(receivedMessage.sender).toEqual({
+          id: sender.id,
+          firstName: sender.firstName,
+          lastName: sender.lastName,
+        });
+        done();
+      });
+
+      clientSocket.emit('new_message', messageData);
+    });
+
+    it('should broadcast typing indicators', (done) => {
+      receiverSocket.on('user_typing', (data) => {
+        expect(data.userId).toBe(sender.id);
+        expect(data.conversationId).toBe(conversationId);
+        expect(data.user).toEqual({
+          id: sender.id,
+          firstName: sender.firstName,
+          lastName: sender.lastName,
+        });
+        done();
+      });
+
+      clientSocket.emit('typing', { conversationId });
+    });
+
+    it('should broadcast stop typing indicators', (done) => {
+      receiverSocket.on('user_stop_typing', (data) => {
+        expect(data.userId).toBe(sender.id);
+        expect(data.conversationId).toBe(conversationId);
+        done();
+      });
+
+      clientSocket.emit('stop_typing', { conversationId });
+    });
+
+    it('should broadcast message read status', (done) => {
+      const messageIds = ['message-1', 'message-2'];
+
+      receiverSocket.on('messages_read', (data) => {
+        expect(data.messageIds).toEqual(messageIds);
+        expect(data.readBy).toBe(sender.id);
+        expect(data.conversationId).toBe(conversationId);
+        done();
+      });
+
+      clientSocket.emit('message_read', {
+        messageIds,
+        conversationId,
+      });
+    });
+
+    it('should handle user disconnect and reconnect', (done) => {
+      // Disconnect client
+      clientSocket.disconnect();
+
+      // Wait a bit
+      setTimeout(() => {
+        // Reconnect
+        clientSocket.connect();
+
+        clientSocket.on('connect', () => {
+          expect(clientSocket.connected).toBe(true);
+          done();
+        });
+      }, 100);
+    });
+
+    it('should maintain conversation state across reconnections', (done) => {
+      // Disconnect and reconnect
+      clientSocket.disconnect();
+
+      setTimeout(() => {
+        clientSocket.connect();
+
+        clientSocket.on('connect', () => {
+          // Rejoin conversation
+          clientSocket.emit('join_conversation', conversationId);
+
+          // Test that messaging still works
+          const messageData = {
+            conversationId,
+            content: 'Message after reconnection',
+            propertyId: property.id,
+          };
+
+          receiverSocket.on('new_message', (receivedMessage) => {
+            expect(receivedMessage.content).toBe(messageData.content);
+            done();
+          });
+
+          // Wait a bit for rejoin to complete, then send message
+          setTimeout(() => {
+            clientSocket.emit('new_message', messageData);
+          }, 100);
+        });
+      }, 100);
+    });
+  });
+
+  describe('WebSocket Error Handling', () => {
+    it('should handle database errors gracefully during conversation join', (done) => {
+      // Create a conversation ID that will cause database issues
+      const problematicConversationId = 'problematic_conversation';
+
+      clientSocket.on('error', (error) => {
+        expect(error.message).toBe('Failed to join conversation');
+        done();
+      });
+
+      // This should trigger an error in the conversation verification
+      clientSocket.emit('join_conversation', problematicConversationId);
+    });
+
+    it('should handle malformed message data', (done) => {
+      // Send malformed message data
+      const malformedData = {
+        // Missing required fields
+        content: 'Test message',
+      };
+
+      // The WebSocket should handle this gracefully without crashing
+      clientSocket.emit('new_message', malformedData);
+
+      // If no crash occurs within a reasonable time, consider it handled
+      setTimeout(() => {
+        expect(clientSocket.connected).toBe(true);
+        done();
+      }, 200);
+    });
+  });
+
+  describe('WebSocket Performance', () => {
+    it('should handle multiple rapid messages', (done) => {
+      const messageCount = 10;
+      let receivedCount = 0;
+      const messages: string[] = [];
+
+      const address = server.address();
+      const port = typeof address === 'string' ? address : address?.port;
+      
+      const receiverSocket = Client(`http://localhost:${port}`, {
+        auth: {
+          token: receiverToken,
+        },
+        transports: ['websocket'],
+      });
+
+      receiverSocket.on('connect', () => {
+        const conversationId = `${sender.id}_${receiver.id}_${property.id}`;
+        
+        // Join conversation
+        clientSocket.emit('join_conversation', conversationId);
+        receiverSocket.emit('join_conversation', conversationId);
+
+        receiverSocket.on('new_message', (receivedMessage) => {
+          messages.push(receivedMessage.content);
+          receivedCount++;
+
+          if (receivedCount === messageCount) {
+            // Verify all messages were received
+            expect(messages).toHaveLength(messageCount);
+            for (let i = 0; i < messageCount; i++) {
+              expect(messages).toContain(`Message ${i}`);
+            }
+            receiverSocket.disconnect();
+            done();
+          }
+        });
+
+        // Send multiple messages rapidly
+        setTimeout(() => {
+          for (let i = 0; i < messageCount; i++) {
+            clientSocket.emit('new_message', {
+              conversationId,
+              content: `Message ${i}`,
+              propertyId: property.id,
+            });
+          }
+        }, 100);
+      });
+    });
+
+    it('should handle concurrent users in same conversation', (done) => {
+      const address = server.address();
+      const port = typeof address === 'string' ? address : address?.port;
+      
+      // Create multiple receiver sockets
+      const receiverSocket1 = Client(`http://localhost:${port}`, {
+        auth: { token: receiverToken },
+        transports: ['websocket'],
+      });
+
+      const receiverSocket2 = Client(`http://localhost:${port}`, {
+        auth: { token: receiverToken },
+        transports: ['websocket'],
+      });
+
+      let connectCount = 0;
+      let messageCount = 0;
+
+      const checkConnections = () => {
+        connectCount++;
+        if (connectCount === 2) {
+          const conversationId = `${sender.id}_${receiver.id}_${property.id}`;
+          
+          // All sockets join the conversation
+          clientSocket.emit('join_conversation', conversationId);
+          receiverSocket1.emit('join_conversation', conversationId);
+          receiverSocket2.emit('join_conversation', conversationId);
+
+          const messageHandler = (receivedMessage: any) => {
+            expect(receivedMessage.content).toBe('Broadcast test message');
+            messageCount++;
+            
+            // Both receiver sockets should receive the message
+            if (messageCount === 2) {
+              receiverSocket1.disconnect();
+              receiverSocket2.disconnect();
+              done();
+            }
+          };
+
+          receiverSocket1.on('new_message', messageHandler);
+          receiverSocket2.on('new_message', messageHandler);
+
+          // Send message after a short delay
+          setTimeout(() => {
+            clientSocket.emit('new_message', {
+              conversationId,
+              content: 'Broadcast test message',
+              propertyId: property.id,
+            });
+          }, 200);
+        }
+      };
+
+      receiverSocket1.on('connect', checkConnections);
+      receiverSocket2.on('connect', checkConnections);
     });
   });
 });
