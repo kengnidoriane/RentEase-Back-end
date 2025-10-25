@@ -34,6 +34,7 @@ export interface Property {
   _count?: {
     favorites: number;
   };
+  isFavorited?: boolean; // For authenticated users
 }
 
 export interface PropertyImage {

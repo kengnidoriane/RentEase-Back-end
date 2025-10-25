@@ -40,7 +40,7 @@ export class PropertyController {
     }
   };
 
-  getProperty = async (req: Request, res: Response, next: NextFunction) => {
+  getProperty = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.params['id']) {
         return res.status(400).json({
@@ -50,9 +50,10 @@ export class PropertyController {
       }
       
       const id = req.params['id'];
-      const userId = (req as AuthenticatedRequest).user?.id;
+      const userId = req.user?.id;
 
-      const property = await this.propertyService.getPropertyById(id, userId);
+      // Use the enhanced method that includes favorite status
+      const property = await this.propertyService.getPropertyByIdWithFavorites(id, userId);
 
       res.json({
         success: true,
@@ -108,7 +109,7 @@ export class PropertyController {
     }
   };
 
-  searchProperties = async (req: Request, res: Response, next: NextFunction) => {
+  searchProperties = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const filters: any = {};
       
@@ -135,7 +136,9 @@ export class PropertyController {
         limit: req.query['limit'] ? Number(req.query['limit']) : 20,
       };
 
-      const result = await this.propertyService.searchProperties(query);
+      // Use the enhanced search method that includes favorite status
+      const userId = req.user?.id;
+      const result = await this.propertyService.searchPropertiesWithFavorites(query, userId);
 
       res.json({
         success: true,

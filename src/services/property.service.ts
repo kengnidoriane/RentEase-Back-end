@@ -1,5 +1,6 @@
 import { PrismaClient, VerificationStatus } from '@prisma/client';
 import { PropertyRepository } from '../repositories/property.repository';
+import { FavoriteRepository } from '../repositories/favorite.repository';
 import {
   Property,
   CreatePropertyRequest,
@@ -13,9 +14,11 @@ import { AppError } from '../utils/errors';
 
 export class PropertyService {
   private propertyRepository: PropertyRepository;
+  private favoriteRepository: FavoriteRepository;
 
   constructor(private prisma: PrismaClient) {
     this.propertyRepository = new PropertyRepository(prisma);
+    this.favoriteRepository = new FavoriteRepository(prisma);
   }
 
   async createProperty(landlordId: string, data: CreatePropertyRequest): Promise<Property> {
@@ -295,5 +298,43 @@ export class PropertyService {
     await this.prisma.propertyImage.delete({
       where: { id: imageId },
     });
+  }
+
+  // Helper method to add favorite status to properties
+  private async addFavoriteStatusToProperties(properties: Property[], userId?: string): Promise<Property[]> {
+    if (!userId) {
+      return properties.map(property => ({ ...property, isFavorited: false }));
+    }
+
+    const propertyIds = properties.map(p => p.id);
+    const favoriteStatuses = await this.favoriteRepository.getFavoriteStatusForProperties(userId, propertyIds);
+
+    return properties.map(property => ({
+      ...property,
+      isFavorited: favoriteStatuses[property.id] || false,
+    }));
+  }
+
+  // Enhanced search method with favorite status
+  async searchPropertiesWithFavorites(query: PropertySearchQuery, userId?: string): Promise<PropertySearchResult> {
+    const result = await this.searchProperties(query);
+    const propertiesWithFavorites = await this.addFavoriteStatusToProperties(result.properties, userId);
+
+    return {
+      ...result,
+      properties: propertiesWithFavorites,
+    };
+  }
+
+  // Enhanced get property by id with favorite status
+  async getPropertyByIdWithFavorites(id: string, userId?: string): Promise<Property> {
+    const property = await this.getPropertyById(id, userId);
+    
+    if (userId) {
+      const favoriteStatus = await this.favoriteRepository.getFavoriteStatus(userId, id);
+      return { ...property, isFavorited: favoriteStatus.isFavorited };
+    }
+
+    return { ...property, isFavorited: false };
   }
 }
