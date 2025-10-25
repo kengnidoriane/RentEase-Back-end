@@ -69,6 +69,7 @@ import adminRoutes from '@/routes/admin.routes';
 import propertyRoutes from '@/routes/property.routes';
 import messageRoutes from '@/routes/message.routes';
 import favoriteRoutes from '@/routes/favorite.routes';
+import { notificationRoutes } from '@/routes/notification.routes';
 
 // API routes
 app.get('/api', (_req, res) => {
@@ -86,6 +87,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/favorites', favoriteRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);

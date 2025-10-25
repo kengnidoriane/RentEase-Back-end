@@ -21,6 +21,7 @@ model User {
   profilePicture         String?
   isVerified             Boolean                 @default(false)
   isActive               Boolean                 @default(true)
+  lastActiveAt           DateTime?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   
@@ -29,6 +30,8 @@ model User {
   receivedMessages       Message[]               @relation("MessageReceiver")
   favorites              Favorite[]
   verificationDocuments  VerificationDocument[]
+  notifications          Notification[]
+  notificationPreferences NotificationPreference[]
   
   @@map("users")
 }
@@ -143,4 +146,60 @@ enum DocumentType {
   ID
   PROPERTY_OWNERSHIP
   PROOF_OF_ADDRESS
+}
+
+model Notification {
+  id          String            @id @default(cuid())
+  type        NotificationType
+  title       String
+  message     String
+  data        Json?
+  isRead      Boolean           @default(false)
+  channel     NotificationChannel
+  status      NotificationStatus @default(PENDING)
+  sentAt      DateTime?
+  createdAt   DateTime          @default(now())
+  
+  userId      String
+  user        User              @relation(fields: [userId], references: [id])
+  
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id                    String            @id @default(cuid())
+  notificationType      NotificationType
+  emailEnabled          Boolean           @default(true)
+  webPushEnabled        Boolean           @default(true)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  
+  userId                String
+  user                  User              @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, notificationType])
+  @@map("notification_preferences")
+}
+
+enum NotificationType {
+  NEW_MESSAGE
+  FAVORITE_UNAVAILABLE
+  PROPERTY_VERIFIED
+  NEW_LISTING_MATCH
+  REMINDER_INACTIVE
+  PROPERTY_APPROVED
+  PROPERTY_REJECTED
+}
+
+enum NotificationChannel {
+  EMAIL
+  WEB_PUSH
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  DELIVERED
 }

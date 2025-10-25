@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 import { FavoriteRepository } from '../repositories/favorite.repository';
 import { PropertyRepository } from '../repositories/property.repository';
 import { NotificationService } from './notification.service';
@@ -16,7 +17,7 @@ export class FavoriteService {
     private favoriteRepository: FavoriteRepository,
     private propertyRepository: PropertyRepository
   ) {
-    this.notificationService = new NotificationService();
+    this.notificationService = new NotificationService(new PrismaClient());
   }
 
   async addToFavorites(userId: string, data: CreateFavoriteRequest): Promise<FavoriteResponse> {
