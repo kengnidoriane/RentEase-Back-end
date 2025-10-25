@@ -1,22 +1,28 @@
 import { FavoriteService } from '../../services/favorite.service';
 import { FavoriteRepository } from '../../repositories/favorite.repository';
 import { PropertyRepository } from '../../repositories/property.repository';
+import { NotificationService } from '../../services/notification.service';
 import { AppError } from '../../utils/errors';
 import { CreateFavoriteRequest } from '../../types/favorite.types';
 
-// Mock the repositories
+// Mock the repositories and services
 jest.mock('../../repositories/favorite.repository');
 jest.mock('../../repositories/property.repository');
+jest.mock('../../services/notification.service');
 
 describe('FavoriteService', () => {
   let favoriteService: FavoriteService;
   let mockFavoriteRepository: jest.Mocked<FavoriteRepository>;
   let mockPropertyRepository: jest.Mocked<PropertyRepository>;
+  let mockNotificationService: jest.Mocked<NotificationService>;
 
   beforeEach(() => {
     mockFavoriteRepository = new FavoriteRepository({} as any) as jest.Mocked<FavoriteRepository>;
     mockPropertyRepository = new PropertyRepository({} as any) as jest.Mocked<PropertyRepository>;
     favoriteService = new FavoriteService(mockFavoriteRepository, mockPropertyRepository);
+    
+    // Get the mocked notification service instance
+    mockNotificationService = (favoriteService as any).notificationService as jest.Mocked<NotificationService>;
   });
 
   afterEach(() => {
@@ -216,6 +222,46 @@ describe('FavoriteService', () => {
     });
   });
 
+  describe('removeFavoriteById', () => {
+    const userId = 'user-123';
+    const favoriteId = 'favorite-123';
+
+    it('should successfully remove favorite by ID', async () => {
+      mockFavoriteRepository.deleteById.mockResolvedValue(true);
+
+      await favoriteService.removeFavoriteById(userId, favoriteId);
+
+      expect(mockFavoriteRepository.deleteById).toHaveBeenCalledWith(favoriteId, userId);
+    });
+
+    it('should throw error if favorite not found', async () => {
+      mockFavoriteRepository.deleteById.mockResolvedValue(false);
+
+      await expect(favoriteService.removeFavoriteById(userId, favoriteId)).rejects.toThrow(
+        new AppError('Favorite not found', 404)
+      );
+    });
+  });
+
+  describe('getFavoriteStatusForProperties', () => {
+    const userId = 'user-123';
+    const propertyIds = ['property-1', 'property-2', 'property-3'];
+
+    it('should return favorite status for multiple properties', async () => {
+      const mockStatuses = {
+        'property-1': true,
+        'property-2': false,
+        'property-3': true,
+      };
+      mockFavoriteRepository.getFavoriteStatusForProperties.mockResolvedValue(mockStatuses);
+
+      const result = await favoriteService.getFavoriteStatusForProperties(userId, propertyIds);
+
+      expect(result).toEqual(mockStatuses);
+      expect(mockFavoriteRepository.getFavoriteStatusForProperties).toHaveBeenCalledWith(userId, propertyIds);
+    });
+  });
+
   describe('getUnavailableFavorites', () => {
     const userId = 'user-123';
 
@@ -261,6 +307,163 @@ describe('FavoriteService', () => {
       ]);
 
       expect(mockFavoriteRepository.findUnavailableFavorites).toHaveBeenCalledWith(userId);
+    });
+
+    it('should return empty array if no unavailable favorites', async () => {
+      mockFavoriteRepository.findUnavailableFavorites.mockResolvedValue([]);
+
+      const result = await favoriteService.getUnavailableFavorites(userId);
+
+      expect(result).toEqual([]);
+      expect(mockFavoriteRepository.findUnavailableFavorites).toHaveBeenCalledWith(userId);
+    });
+  });
+
+  describe('getFavoriteCount', () => {
+    const propertyId = 'property-123';
+
+    it('should return favorite count for property', async () => {
+      const expectedCount = 5;
+      mockFavoriteRepository.countByProperty.mockResolvedValue(expectedCount);
+
+      const result = await favoriteService.getFavoriteCount(propertyId);
+
+      expect(result).toBe(expectedCount);
+      expect(mockFavoriteRepository.countByProperty).toHaveBeenCalledWith(propertyId);
+    });
+
+    it('should return 0 if property has no favorites', async () => {
+      mockFavoriteRepository.countByProperty.mockResolvedValue(0);
+
+      const result = await favoriteService.getFavoriteCount(propertyId);
+
+      expect(result).toBe(0);
+      expect(mockFavoriteRepository.countByProperty).toHaveBeenCalledWith(propertyId);
+    });
+  });
+
+  describe('checkAndNotifyUnavailableFavorites', () => {
+    const userId = 'user-123';
+
+    it('should send notifications for unavailable favorites', async () => {
+      const mockUnavailableFavorites = [
+        {
+          id: 'favorite-1',
+          createdAt: new Date(),
+          propertyId: 'property-1',
+          property: {
+            id: 'property-1',
+            title: 'Unavailable Property 1',
+            price: 1000,
+            currency: 'EUR',
+            propertyType: 'APARTMENT',
+            city: 'Paris',
+            isActive: false,
+            images: [],
+          },
+        },
+        {
+          id: 'favorite-2',
+          createdAt: new Date(),
+          propertyId: 'property-2',
+          property: {
+            id: 'property-2',
+            title: 'Unavailable Property 2',
+            price: 1200,
+            currency: 'EUR',
+            propertyType: 'HOUSE',
+            city: 'Lyon',
+            isActive: false,
+            images: [],
+          },
+        },
+      ] as any;
+
+      mockFavoriteRepository.findUnavailableFavorites.mockResolvedValue(mockUnavailableFavorites);
+      mockNotificationService.sendBatchFavoriteUnavailableNotifications.mockResolvedValue();
+
+      await favoriteService.checkAndNotifyUnavailableFavorites(userId);
+
+      expect(mockFavoriteRepository.findUnavailableFavorites).toHaveBeenCalledWith(userId);
+      expect(mockNotificationService.sendBatchFavoriteUnavailableNotifications).toHaveBeenCalledWith(
+        userId,
+        [
+          { id: 'property-1', title: 'Unavailable Property 1' },
+          { id: 'property-2', title: 'Unavailable Property 2' },
+        ]
+      );
+    });
+
+    it('should not send notifications if no unavailable favorites', async () => {
+      mockFavoriteRepository.findUnavailableFavorites.mockResolvedValue([]);
+
+      await favoriteService.checkAndNotifyUnavailableFavorites(userId);
+
+      expect(mockFavoriteRepository.findUnavailableFavorites).toHaveBeenCalledWith(userId);
+      expect(mockNotificationService.sendBatchFavoriteUnavailableNotifications).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getUserFavorites - edge cases', () => {
+    const userId = 'user-123';
+
+    it('should handle favorites with missing images', async () => {
+      const mockFavorites = [
+        {
+          id: 'favorite-1',
+          createdAt: new Date(),
+          propertyId: 'property-1',
+          property: {
+            id: 'property-1',
+            title: 'Property without images',
+            price: 1000,
+            currency: 'EUR',
+            propertyType: 'APARTMENT',
+            city: 'Paris',
+            isActive: true,
+            images: null, // No images
+          },
+        },
+      ] as any;
+
+      mockFavoriteRepository.findByUser.mockResolvedValue({
+        favorites: mockFavorites,
+        total: 1,
+      });
+
+      const result = await favoriteService.getUserFavorites(userId, 1, 10);
+
+      expect(result.favorites[0]!.property.images).toEqual([]);
+    });
+
+    it('should calculate total pages correctly', async () => {
+      const mockFavorites = Array.from({ length: 5 }, (_, i) => ({
+        id: `favorite-${i + 1}`,
+        createdAt: new Date(),
+        propertyId: `property-${i + 1}`,
+        property: {
+          id: `property-${i + 1}`,
+          title: `Property ${i + 1}`,
+          price: 1000,
+          currency: 'EUR',
+          propertyType: 'APARTMENT',
+          city: 'Paris',
+          isActive: true,
+          images: [],
+        },
+      })) as any;
+
+      mockFavoriteRepository.findByUser.mockResolvedValue({
+        favorites: mockFavorites,
+        total: 23, // 23 total favorites
+      });
+
+      const result = await favoriteService.getUserFavorites(userId, 1, 10);
+
+      expect(result.totalPages).toBe(3); // Math.ceil(23 / 10) = 3
+      expect(result.total).toBe(23);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(10);
     });
   });
 });
