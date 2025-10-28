@@ -8,7 +8,7 @@ import { logger } from '@/utils/logger';
 const storage = multer.memoryStorage();
 
 // File filter for images
-const imageFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const imageFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
   
   if (allowedMimes.includes(file.mimetype)) {
@@ -19,7 +19,7 @@ const imageFilter = (req: Express.Request, file: Express.Multer.File, cb: multer
 };
 
 // File filter for documents
-const documentFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const documentFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const allowedMimes = [
     'image/jpeg', 'image/jpg', 'image/png', 'image/webp',
     'application/pdf',

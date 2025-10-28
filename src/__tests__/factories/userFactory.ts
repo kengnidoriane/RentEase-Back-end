@@ -26,6 +26,7 @@ export const createUserData = (
   profilePicture: null,
   isVerified: overrides.isVerified ?? true,
   isActive: overrides.isActive ?? true,
+  lastActiveAt: null,
 });
 
 // Alias for backward compatibility

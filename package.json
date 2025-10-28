@@ -4,7 +4,7 @@
   "description": "Backend API for RentEase - A platform connecting verified tenants with verified landlords",
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --project tsconfig.build.json",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "test": "jest",
@@ -18,7 +18,13 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx src/prisma/seed.ts",
     "db:studio": "prisma studio",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "deploy:check": "node scripts/pre-deploy-check.js",
+    "deploy:build": "npm run lint:fix && tsc --skipLibCheck && npm run db:generate",
+    "deploy:prod": "npm run deploy:check && npm run deploy:build",
+    "test:prod": "node scripts/test-production.js",
+    "test:db": "node scripts/test-database.js",
+    "check:env": "node scripts/check-env.js"
   },
   "keywords": [
     "rental",

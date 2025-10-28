@@ -19,33 +19,38 @@ export class DatabaseOptimizationService {
   private setupQueryLogging(): void {
     // Enable query logging in development
     if (process.env.NODE_ENV === 'development') {
-      this.prisma.$on('query', (e) => {
-        const queryKey = this.normalizeQuery(e.query);
-        const duration = e.duration;
+      try {
+        // Type assertion for Prisma query event
+        (this.prisma as any).$on('query', (e: any) => {
+          const queryKey = this.normalizeQuery(e.query || '');
+          const duration = e.duration || 0;
 
-        // Update metrics
-        const existing = this.queryMetrics.get(queryKey);
-        if (existing) {
-          existing.count++;
-          existing.totalTime += duration;
-          existing.avgTime = existing.totalTime / existing.count;
-        } else {
-          this.queryMetrics.set(queryKey, {
-            count: 1,
-            totalTime: duration,
-            avgTime: duration,
-          });
-        }
+          // Update metrics
+          const existing = this.queryMetrics.get(queryKey);
+          if (existing) {
+            existing.count++;
+            existing.totalTime += duration;
+            existing.avgTime = existing.totalTime / existing.count;
+          } else {
+            this.queryMetrics.set(queryKey, {
+              count: 1,
+              totalTime: duration,
+              avgTime: duration,
+            });
+          }
 
-        // Log slow queries
-        if (duration > 1000) { // Queries taking more than 1 second
-          logger.warn('Slow query detected', {
-            query: e.query,
-            duration: `${duration}ms`,
-            params: e.params,
-          });
-        }
-      });
+          // Log slow queries
+          if (duration > 1000) { // Queries taking more than 1 second
+            logger.warn('Slow query detected', {
+              query: e.query || 'Unknown query',
+              duration: `${duration}ms`,
+              params: e.params || 'No params',
+            });
+          }
+        });
+      } catch (error) {
+        logger.warn('Query logging setup failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   }
 

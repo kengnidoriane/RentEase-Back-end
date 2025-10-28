@@ -57,16 +57,16 @@ export class RateLimitMiddleware {
     const pipeline = redisClient.multi();
     
     // Remove old entries outside the window
-    pipeline.zremrangebyscore(key, 0, windowStart);
+    pipeline.zRemRangeByScore(key, 0, windowStart);
     
     // Count current requests in window
-    pipeline.zcard(key);
+    pipeline.zCard(key);
     
     // Set expiration for the key
     pipeline.expire(key, Math.ceil(this.options.windowMs / 1000));
     
     const results = await pipeline.exec();
-    const totalHitsPerWindow = (results?.[1]?.[1] as number) || 0;
+    const totalHitsPerWindow = (results?.[1] as any)?.[1] || 0;
     
     const resetTime = new Date(now + this.options.windowMs);
     const remainingRequests = Math.max(0, this.options.maxRequests - totalHitsPerWindow);
@@ -87,7 +87,7 @@ export class RateLimitMiddleware {
     const pipeline = redisClient.multi();
     
     // Add current request with timestamp
-    pipeline.zadd(key, now, `${now}-${Math.random()}`);
+    pipeline.zAdd(key, { score: now, value: `${now}-${Math.random()}` });
     
     // Set expiration
     pipeline.expire(key, Math.ceil(this.options.windowMs / 1000));

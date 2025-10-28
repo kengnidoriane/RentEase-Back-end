@@ -35,7 +35,7 @@ export class CacheMiddleware {
     const varyHeaders = this.options.varyBy
       .map(header => `${header}:${req.get(header) || ''}`)
       .join('|');
-    
+
     return `cache:${req.method}:${req.path}:${queryString}:${userId}:${varyHeaders}`;
   }
 
@@ -51,11 +51,11 @@ export class CacheMiddleware {
    */
   private async storeCacheTags(cacheKey: string, tags: string[]): Promise<void> {
     if (tags.length === 0) return;
-    
+
     try {
       const tagsKey = this.getTagsKey(cacheKey);
       await redisClient.setEx(tagsKey, this.options.ttl, JSON.stringify(tags));
-      
+
       // Add to tag index for invalidation
       for (const tag of tags) {
         const tagIndexKey = `tag_index:${tag}`;
@@ -86,29 +86,29 @@ export class CacheMiddleware {
 
       try {
         const cacheKey = this.options.keyGenerator(req);
-        
+
         // Try to get cached response
         const cachedResponse = await redisClient.get(cacheKey);
-        
+
         if (cachedResponse) {
           const parsed = JSON.parse(cachedResponse);
-          
+
           // Set cached headers
           if (parsed.headers) {
             Object.entries(parsed.headers).forEach(([key, value]) => {
               res.set(key, value as string);
             });
           }
-          
+
           // Add cache headers
           res.set({
             'X-Cache': 'HIT',
             'X-Cache-Key': cacheKey,
             'Cache-Control': `public, max-age=${this.options.ttl}`,
           });
-          
+
           logger.debug('Cache hit', { cacheKey, path: req.path });
-          
+
           res.status(parsed.statusCode).json(parsed.body);
           return;
         }
@@ -117,14 +117,14 @@ export class CacheMiddleware {
         const originalJson = res.json;
         const originalStatus = res.status;
         let statusCode = 200;
-        
-        res.status = function(code: number) {
+
+        res.status = function (code: number) {
           statusCode = code;
           return originalStatus.call(this, code);
         };
 
         const self = this;
-        res.json = function(body: any) {
+        res.json = function (body: any) {
           // Only cache successful responses
           if (statusCode >= 200 && statusCode < 300) {
             const responseData = {
@@ -188,18 +188,18 @@ export class CacheMiddleware {
       for (const tag of tags) {
         const tagIndexKey = `tag_index:${tag}`;
         const cacheKeys = await redisClient.sMembers(tagIndexKey);
-        
+
         if (cacheKeys.length > 0) {
           // Delete cache entries
           await redisClient.del(cacheKeys);
-          
+
           // Delete tag entries
           const tagKeys = cacheKeys.map(key => this.getTagsKey(key));
           await redisClient.del(tagKeys);
-          
+
           // Delete tag index
           await redisClient.del(tagIndexKey);
-          
+
           logger.info(`Invalidated ${cacheKeys.length} cache entries by tag`, { tag });
         }
       }
@@ -234,7 +234,7 @@ export class CacheMiddleware {
     try {
       const keys = await redisClient.keys('cache:*');
       let totalSize = 0;
-      
+
       for (const key of keys) {
         try {
           // Redis memory command might not be available in all versions
@@ -245,7 +245,7 @@ export class CacheMiddleware {
           totalSize += 100; // Estimate 100 bytes per key
         }
       }
-      
+
       return {
         totalKeys: keys.length,
         totalSize,
@@ -323,7 +323,7 @@ export class CacheInvalidator {
   static async invalidatePropertyCaches(propertyId?: string): Promise<void> {
     await CacheConfigs.properties.invalidateByTags(['properties']);
     await CacheConfigs.search.invalidateByTags(['search', 'properties']);
-    
+
     if (propertyId) {
       await CacheConfigs.properties.invalidateByPattern(`cache:*:properties/${propertyId}*`);
     }
@@ -334,7 +334,7 @@ export class CacheInvalidator {
    */
   static async invalidateUserCaches(userId?: string): Promise<void> {
     await CacheConfigs.profile.invalidateByTags(['profile']);
-    
+
     if (userId) {
       await CacheConfigs.profile.invalidateByPattern(`cache:profile:${userId}:*`);
     }

@@ -46,7 +46,7 @@ export class AdminAuditService {
         timestamp: activityLog.timestamp,
       });
 
-      return activityLog;
+      return activityLog as any;
     } catch (error) {
       logger.error('Error logging admin activity:', error);
       throw new Error('Failed to log admin activity');
@@ -126,7 +126,7 @@ export class AdminAuditService {
         }, {} as Record<string, number>),
       };
 
-      return { logs, total, summary };
+      return { logs: logs as any, total, summary };
     } catch (error) {
       logger.error('Error getting activity logs:', error);
       throw new Error('Failed to get activity logs');
@@ -170,7 +170,7 @@ export class AdminAuditService {
           WHERE timestamp >= ${startDate}
           GROUP BY DATE(timestamp)
           ORDER BY date DESC
-        ` as Array<{ date: Date; count: bigint }>,
+        ` as any,
       ]);
 
       return {
@@ -180,9 +180,9 @@ export class AdminAuditService {
           action: item.action,
           count: item._count.id,
         })),
-        dailyActivity: dailyActivity.map(item => ({
-          date: item.date.toISOString().split('T')[0],
-          count: Number(item.count),
+        dailyActivity: dailyActivity.map((item: any) => ({
+          date: item.date?.toISOString?.()?.split('T')[0] || 'unknown',
+          count: Number(item.count || 0),
         })),
       };
     } catch (error) {
@@ -198,7 +198,7 @@ export class AdminAuditService {
     targetType: string,
     targetId: string,
     limit: number = 100
-  ): Promise<AdminActivityLog[]> {
+  ): Promise<any[]> {
     try {
       return await this.db.adminActivityLog.findMany({
         where: {
