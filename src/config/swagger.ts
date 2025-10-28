@@ -19,7 +19,7 @@ const swaggerDefinition: SwaggerDefinition = {
   servers: [
     {
       url: process.env.NODE_ENV === 'production' 
-        ? process.env.API_URL || 'https://api.rentease.com'
+        ? process.env['API_URL'] || 'https://api.rentease.com'
         : `http://localhost:${process.env.PORT || 3000}`,
       description: process.env.NODE_ENV === 'production' ? 'Production server' : 'Development server',
     },

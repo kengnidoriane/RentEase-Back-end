@@ -34,6 +34,12 @@ model User {
   notificationPreferences NotificationPreference[]
   adminActivityLogs      AdminActivityLog[]
   
+  @@index([email])
+  @@index([userType])
+  @@index([isVerified])
+  @@index([isActive])
+  @@index([createdAt])
+  @@index([lastActiveAt])
   @@map("users")
 }
 
@@ -64,6 +70,19 @@ model Property {
   favorites          Favorite[]
   messages           Message[]
   
+  @@index([landlordId])
+  @@index([city])
+  @@index([propertyType])
+  @@index([price])
+  @@index([bedrooms])
+  @@index([isVerified])
+  @@index([isActive])
+  @@index([verificationStatus])
+  @@index([createdAt])
+  @@index([latitude, longitude])
+  @@index([city, propertyType])
+  @@index([price, bedrooms])
+  @@index([isVerified, isActive])
   @@map("properties")
 }
 
@@ -81,6 +100,14 @@ model Message {
   propertyId     String
   property       Property @relation(fields: [propertyId], references: [id])
   
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([propertyId])
+  @@index([conversationId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@index([senderId, receiverId])
+  @@index([conversationId, createdAt])
   @@map("messages")
 }
 
@@ -164,6 +191,13 @@ model Notification {
   userId      String
   user        User              @relation(fields: [userId], references: [id])
   
+  @@index([userId])
+  @@index([type])
+  @@index([isRead])
+  @@index([status])
+  @@index([createdAt])
+  @@index([userId, isRead])
+  @@index([userId, type])
   @@map("notifications")
 }
 
@@ -218,6 +252,13 @@ model AdminActivityLog {
   adminId     String
   admin       User        @relation(fields: [adminId], references: [id])
   
+  @@index([adminId])
+  @@index([action])
+  @@index([targetType])
+  @@index([targetId])
+  @@index([timestamp])
+  @@index([adminId, timestamp])
+  @@index([action, timestamp])
   @@map("admin_activity_logs")
 }
 

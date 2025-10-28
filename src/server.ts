@@ -12,6 +12,15 @@ import { logger } from '@/utils/logger';
 import { errorHandler } from '@/middleware/error.middleware';
 import { WebSocketService } from '@/services/websocket.service';
 import { RateLimitConfigs, addRateLimitHeaders } from '@/middleware/rate-limit.middleware';
+import { 
+  sanitizeInput, 
+  contentSecurityPolicy, 
+  securityHeaders, 
+  requestSizeLimit,
+  securityLogger 
+} from '@/middleware/security.middleware';
+import { CacheConfigs } from '@/middleware/cache.middleware';
+import { performanceMonitor } from '@/services/performance-monitoring.service';
 
 // Load environment variables
 dotenv.config();
@@ -26,17 +35,16 @@ let webSocketService: WebSocketService;
 // Security middleware
 app.use(
   helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts for Swagger UI
-        imgSrc: ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'"],
-      },
-    },
+    contentSecurityPolicy: false, // We'll use our custom CSP middleware
   })
 );
+
+// Custom security middleware
+app.use(contentSecurityPolicy);
+app.use(securityHeaders);
+app.use(securityLogger);
+app.use(requestSizeLimit('10mb'));
+app.use(sanitizeInput);
 
 // CORS configuration
 app.use(
@@ -56,6 +64,9 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Performance monitoring middleware
+app.use(performanceMonitor.trackPerformance());
+
 // Rate limiting middleware
 app.use('/api', RateLimitConfigs.general.middleware());
 app.use('/api/auth/login', RateLimitConfigs.auth.middleware());
@@ -68,6 +79,12 @@ app.use('/api/admin', RateLimitConfigs.admin.middleware());
 
 // Add rate limit headers to responses
 app.use(addRateLimitHeaders);
+
+// Caching middleware for specific routes
+app.use('/api/properties/search', CacheConfigs.search.middleware());
+app.use('/api/properties/:id', CacheConfigs.properties.middleware());
+app.use('/api/users/profile', CacheConfigs.profile.middleware());
+app.use('/api/admin/stats', CacheConfigs.adminStats.middleware());
 
 // Swagger UI setup
 const swaggerUiOptions = {
@@ -92,11 +109,25 @@ app.get('/api/docs.json', (_req, res) => {
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
-  res.status(200).json({
-    success: true,
+  const healthStatus = performanceMonitor.getHealthStatus();
+  const statusCode = healthStatus.status === 'critical' ? 503 : 200;
+  
+  res.status(statusCode).json({
+    success: healthStatus.status !== 'critical',
     message: 'RentEase API is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
+    health: healthStatus,
+    performance: performanceMonitor.getPerformanceMetrics(),
+  });
+});
+
+// Performance metrics endpoint
+app.get('/metrics', (_req, res) => {
+  res.status(200).json({
+    success: true,
+    data: performanceMonitor.exportMetrics(),
+    timestamp: new Date().toISOString(),
   });
 });
 
