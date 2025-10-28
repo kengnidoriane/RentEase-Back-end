@@ -32,6 +32,7 @@ model User {
   verificationDocuments  VerificationDocument[]
   notifications          Notification[]
   notificationPreferences NotificationPreference[]
+  adminActivityLogs      AdminActivityLog[]
   
   @@map("users")
 }
@@ -202,4 +203,32 @@ enum NotificationStatus {
   SENT
   FAILED
   DELIVERED
+}
+
+model AdminActivityLog {
+  id          String      @id @default(cuid())
+  action      AdminAction
+  targetType  String
+  targetId    String
+  details     Json
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime    @default(now())
+  
+  adminId     String
+  admin       User        @relation(fields: [adminId], references: [id])
+  
+  @@map("admin_activity_logs")
+}
+
+enum AdminAction {
+  USER_STATUS_UPDATED
+  USER_SUSPENDED
+  USER_ACTIVATED
+  PROPERTY_APPROVED
+  PROPERTY_REJECTED
+  DOCUMENT_APPROVED
+  DOCUMENT_REJECTED
+  ADMIN_LOGIN
+  ADMIN_LOGOUT
 }

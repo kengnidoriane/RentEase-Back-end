@@ -1,12 +1,22 @@
 import { Request, Response } from 'express';
 import { UserRepository } from '@/repositories/user.repository';
+import { PropertyRepository } from '@/repositories/property.repository';
+import { AdminService } from '@/services/admin.service';
+import { AdminAuditService } from '@/services/admin-audit.service';
 import { logger } from '@/utils/logger';
+import { prisma } from '@/config/database';
 
 export class AdminController {
   private userRepository: UserRepository;
+  private propertyRepository: PropertyRepository;
+  private adminService: AdminService;
+  private auditService: AdminAuditService;
 
   constructor() {
     this.userRepository = new UserRepository();
+    this.propertyRepository = new PropertyRepository(prisma);
+    this.adminService = new AdminService();
+    this.auditService = new AdminAuditService();
   }
 
   /**
@@ -266,7 +276,7 @@ export class AdminController {
    */
   getDashboardStats = async (req: Request, res: Response): Promise<void> => {
     try {
-      const stats = await this.userRepository.getDashboardStats();
+      const stats = await this.adminService.getDashboardStats();
       
       res.status(200).json({
         success: true,
@@ -280,6 +290,350 @@ export class AdminController {
         error: {
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to get dashboard statistics',
+          timestamp: new Date().toISOString(),
+          path: req.path,
+        },
+      });
+    }
+  };
+
+  /**
+   * Get all properties pending verification (admin only)
+   */
+  getPendingProperties = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const properties = await this.propertyRepository.findPendingVerification();
+      
+      res.status(200).json({
+        success: true,
+        data: { properties },
+      });
+    } catch (error) {
+      logger.error('Get pending properties error:', error);
+      
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to get pending properties',
+          timestamp: new Date().toISOString(),
+          path: req.path,
+        },
+      });
+    }
+  };
+
+  /**
+   * Get property by ID for verification (admin only)
+   */
+  getPropertyById = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const propertyId = req.params['propertyId'];
+      if (!propertyId) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Property ID is required',
+            timestamp: new Date().toISOString(),
+            path: req.path,
+          },
+        });
+        return;
+      }
+      
+      const property = await this.propertyRepository.findById(propertyId, true);
+      if (!property) {
+        res.status(404).json({
+          success: false,
+          error: {
+            code: 'PROPERTY_NOT_FOUND',
+            message: 'Property not found',
+            timestamp: new Date().toISOString(),
+            path: req.path,
+          },
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        data: { property },
+      });
+    } catch (error) {
+      logger.error('Get property by ID error:', error);
+      
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to get property',
+          timestamp: new Date().toISOString(),
+          path: req.path,
+        },
+      });
+    }
+  };
+
+  /**
+   * Approve property (admin only)
+   */
+  approveProperty = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const propertyId = req.params['propertyId'];
+      if (!propertyId) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Property ID is required',
+            timestamp: new Date().toISOString(),
+            path: req.path,
+          },
+        });
+        return;
+      }
+
+      const adminId = req.user?.id;
+      if (!adminId) {
+        res.status(401).json({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Admin authentication required',
+            timestamp: new Date().toISOString(),
+            path: req.path,
+          },
+        });
+        return;
+      }
+
+      await this.adminService.approveProperty(adminId, propertyId);
+      const updatedProperty = await this.propertyRepository.findById(propertyId, true);
+
+      logger.info(`Property approved by admin: ${propertyId}`, { adminId });
+
+      res.status(200).json({
+        success: true,
+        data: { 
+          property: updatedProperty,
+          message: 'Property approved successfully'
+        },
+      });
+    } catch (error) {
+      logger.error('Approve property error:', error);
+      
+      const message = error instanceof Error ? error.message : 'Failed to approve property';
+      const statusCode = message.includes('not found') ? 404 : 500;
+      
+      res.status(statusCode).json({
+        success: false,
+        error: {
+          code: statusCode === 404 ? 'PROPERTY_NOT_FOUND' : 'INTERNAL_SERVER_ERROR',
+          message,
+          timestamp: new Date().toISOString(),
+          path: req.path,
+        },
+      });
+    }
+  };
+
+  /**
+   * Reject property (admin only)
+   */
+  rejectProperty = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const propertyId = req.params['propertyId'];
+      if (!propertyId) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Property ID is required',
+            timestamp: new Date().toISOString(),
+            path: req.path,
+          },
+        });
+        return;
+      }
+
+      const { rejectionReason } = req.body;
+      if (!rejectionReason) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Rejection reason is required',
+            timestamp: new Date().toISOString(),
+            path: req.path,
+          },
+        });
+        return;
+      }
+
+      const adminId = req.user?.id;
+      if (!adminId) {
+        res.status(401).json({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Admin authentication required',
+            timestamp: new Date().toISOString(),
+            path: req.path,
+          },
+        });
+        return;
+      }
+
+      await this.adminService.rejectProperty(adminId, propertyId, rejectionReason);
+      const updatedProperty = await this.propertyRepository.findById(propertyId, true);
+
+      logger.info(`Property rejected by admin: ${propertyId}`, { adminId, rejectionReason });
+
+      res.status(200).json({
+        success: true,
+        data: { 
+          property: updatedProperty,
+          message: 'Property rejected successfully'
+        },
+      });
+    } catch (error) {
+      logger.error('Reject property error:', error);
+      
+      const message = error instanceof Error ? error.message : 'Failed to reject property';
+      const statusCode = message.includes('not found') ? 404 : 500;
+      
+      res.status(statusCode).json({
+        success: false,
+        error: {
+          code: statusCode === 404 ? 'PROPERTY_NOT_FOUND' : 'INTERNAL_SERVER_ERROR',
+          message,
+          timestamp: new Date().toISOString(),
+          path: req.path,
+        },
+      });
+    }
+  };
+
+  /**
+   * Get admin activity logs (admin only)
+   */
+  getActivityLogs = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const page = parseInt(req.query['page'] as string) || 1;
+      const limit = parseInt(req.query['limit'] as string) || 50;
+      const adminId = req.query['adminId'] as string;
+      const action = req.query['action'] as string;
+      const targetType = req.query['targetType'] as string;
+      const targetId = req.query['targetId'] as string;
+      
+      const startDate = req.query['startDate'] ? new Date(req.query['startDate'] as string) : undefined;
+      const endDate = req.query['endDate'] ? new Date(req.query['endDate'] as string) : undefined;
+
+      const options: any = {
+        page,
+        limit,
+      };
+      
+      if (adminId) options.adminId = adminId;
+      if (action) options.action = action;
+      if (targetType) options.targetType = targetType;
+      if (targetId) options.targetId = targetId;
+      if (startDate) options.startDate = startDate;
+      if (endDate) options.endDate = endDate;
+
+      const result = await this.auditService.getActivityLogs(options);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          logs: result.logs,
+          summary: result.summary,
+          pagination: {
+            page,
+            limit,
+            total: result.total,
+            totalPages: Math.ceil(result.total / limit),
+          },
+        },
+      });
+    } catch (error) {
+      logger.error('Get activity logs error:', error);
+      
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to get activity logs',
+          timestamp: new Date().toISOString(),
+          path: req.path,
+        },
+      });
+    }
+  };
+
+  /**
+   * Get activity summary for dashboard (admin only)
+   */
+  getActivitySummary = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const days = parseInt(req.query['days'] as string) || 30;
+      const summary = await this.auditService.getActivitySummary(days);
+      
+      res.status(200).json({
+        success: true,
+        data: summary,
+      });
+    } catch (error) {
+      logger.error('Get activity summary error:', error);
+      
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to get activity summary',
+          timestamp: new Date().toISOString(),
+          path: req.path,
+        },
+      });
+    }
+  };
+
+  /**
+   * Get audit trail for specific target (admin only)
+   */
+  getTargetAuditTrail = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { targetType, targetId } = req.params;
+      const limit = parseInt(req.query['limit'] as string) || 100;
+
+      if (!targetType || !targetId) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Target type and ID are required',
+            timestamp: new Date().toISOString(),
+            path: req.path,
+          },
+        });
+        return;
+      }
+
+      const auditTrail = await this.auditService.getTargetAuditTrail(targetType, targetId, limit);
+      
+      res.status(200).json({
+        success: true,
+        data: { auditTrail },
+      });
+    } catch (error) {
+      logger.error('Get target audit trail error:', error);
+      
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to get audit trail',
           timestamp: new Date().toISOString(),
           path: req.path,
         },
