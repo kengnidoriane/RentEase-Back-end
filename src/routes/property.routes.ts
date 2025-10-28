@@ -209,10 +209,282 @@ const searchValidation = [
 ];
 
 // Public routes
+
+/**
+ * @swagger
+ * /api/properties/search:
+ *   get:
+ *     summary: Search properties with filters
+ *     tags: [Properties]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Number of items per page
+ *       - in: query
+ *         name: minPrice
+ *         schema:
+ *           type: number
+ *           minimum: 0
+ *         description: Minimum price filter
+ *       - in: query
+ *         name: maxPrice
+ *         schema:
+ *           type: number
+ *           minimum: 0
+ *         description: Maximum price filter
+ *       - in: query
+ *         name: bedrooms
+ *         schema:
+ *           type: integer
+ *           minimum: 0
+ *           maximum: 20
+ *         description: Number of bedrooms
+ *       - in: query
+ *         name: bathrooms
+ *         schema:
+ *           type: integer
+ *           minimum: 0
+ *           maximum: 20
+ *         description: Number of bathrooms
+ *       - in: query
+ *         name: propertyType
+ *         schema:
+ *           type: string
+ *           enum: [APARTMENT, ROOM, HOUSE, STUDIO]
+ *         description: Type of property
+ *       - in: query
+ *         name: city
+ *         schema:
+ *           type: string
+ *         description: City name
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [price, createdAt, relevance, distance]
+ *           default: createdAt
+ *         description: Sort field
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *         description: Sort order
+ *       - in: query
+ *         name: latitude
+ *         schema:
+ *           type: number
+ *           minimum: -90
+ *           maximum: 90
+ *         description: Latitude for location-based search
+ *       - in: query
+ *         name: longitude
+ *         schema:
+ *           type: number
+ *           minimum: -180
+ *           maximum: 180
+ *         description: Longitude for location-based search
+ *       - in: query
+ *         name: radius
+ *         schema:
+ *           type: number
+ *           minimum: 0.1
+ *           maximum: 100
+ *         description: Search radius in kilometers
+ *     responses:
+ *       200:
+ *         description: Properties found successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Property'
+ *                     meta:
+ *                       type: object
+ *                       properties:
+ *                         pagination:
+ *                           type: object
+ *                           properties:
+ *                             page:
+ *                               type: integer
+ *                             limit:
+ *                               type: integer
+ *                             total:
+ *                               type: integer
+ *                             totalPages:
+ *                               type: integer
+ *       400:
+ *         description: Invalid search parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ValidationError'
+ */
 router.get('/search', searchValidation, validateRequest, propertyController.searchProperties);
+
+/**
+ * @swagger
+ * /api/properties/{id}:
+ *   get:
+ *     summary: Get property details by ID
+ *     tags: [Properties]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Property ID
+ *     responses:
+ *       200:
+ *         description: Property details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/Property'
+ *       404:
+ *         description: Property not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
+ */
 router.get('/:id', propertyIdValidation, validateRequest, propertyController.getProperty);
 
 // Protected routes - Landlords only
+
+/**
+ * @swagger
+ * /api/properties:
+ *   post:
+ *     summary: Create a new property listing
+ *     tags: [Properties]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - description
+ *               - price
+ *               - propertyType
+ *               - bedrooms
+ *               - bathrooms
+ *               - area
+ *               - address
+ *               - city
+ *               - latitude
+ *               - longitude
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 minLength: 5
+ *                 maxLength: 100
+ *                 example: "Beautiful 2-bedroom apartment in city center"
+ *               description:
+ *                 type: string
+ *                 minLength: 20
+ *                 maxLength: 2000
+ *                 example: "Spacious and modern apartment with great amenities"
+ *               price:
+ *                 type: number
+ *                 minimum: 0
+ *                 example: 1200
+ *               currency:
+ *                 type: string
+ *                 minLength: 3
+ *                 maxLength: 3
+ *                 default: "EUR"
+ *                 example: "EUR"
+ *               propertyType:
+ *                 type: string
+ *                 enum: [APARTMENT, ROOM, HOUSE, STUDIO]
+ *                 example: "APARTMENT"
+ *               bedrooms:
+ *                 type: integer
+ *                 minimum: 0
+ *                 maximum: 20
+ *                 example: 2
+ *               bathrooms:
+ *                 type: integer
+ *                 minimum: 0
+ *                 maximum: 20
+ *                 example: 1
+ *               area:
+ *                 type: number
+ *                 minimum: 1
+ *                 example: 75.5
+ *               address:
+ *                 type: string
+ *                 minLength: 5
+ *                 maxLength: 200
+ *                 example: "123 Main Street, Apartment 4B"
+ *               city:
+ *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 50
+ *                 example: "Paris"
+ *               latitude:
+ *                 type: number
+ *                 minimum: -90
+ *                 maximum: 90
+ *                 example: 48.8566
+ *               longitude:
+ *                 type: number
+ *                 minimum: -180
+ *                 maximum: 180
+ *                 example: 2.3522
+ *     responses:
+ *       201:
+ *         description: Property created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/Property'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ValidationError'
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Only landlords can create properties
+ */
 router.post(
   '/',
   authenticate,

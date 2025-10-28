@@ -18,13 +18,148 @@ const favoriteController = new FavoriteController(favoriteService);
 // All routes require authentication
 router.use(authenticate);
 
-// Add property to favorites
+/**
+ * @swagger
+ * /api/favorites:
+ *   post:
+ *     summary: Add property to favorites
+ *     tags: [Favorites]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - propertyId
+ *             properties:
+ *               propertyId:
+ *                 type: string
+ *                 example: "clp987zyx654wvu321"
+ *     responses:
+ *       201:
+ *         description: Property added to favorites successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/Favorite'
+ *       400:
+ *         description: Property already in favorites or validation error
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Property not found
+ */
 router.post('/', favoriteController.addToFavorites);
 
-// Get user's favorites with pagination
+/**
+ * @swagger
+ * /api/favorites:
+ *   get:
+ *     summary: Get user's favorite properties
+ *     tags: [Favorites]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Number of favorites per page
+ *       - in: query
+ *         name: includeUnavailable
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: Include unavailable properties in results
+ *     responses:
+ *       200:
+ *         description: Favorites retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Favorite'
+ *                     meta:
+ *                       type: object
+ *                       properties:
+ *                         pagination:
+ *                           type: object
+ *                           properties:
+ *                             page:
+ *                               type: integer
+ *                             limit:
+ *                               type: integer
+ *                             total:
+ *                               type: integer
+ *                             totalPages:
+ *                               type: integer
+ *       401:
+ *         description: Unauthorized
+ */
 router.get('/', favoriteController.getUserFavorites);
 
-// Get favorite status for a specific property
+/**
+ * @swagger
+ * /api/favorites/status/{propertyId}:
+ *   get:
+ *     summary: Check if property is in user's favorites
+ *     tags: [Favorites]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: propertyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Property ID to check
+ *     responses:
+ *       200:
+ *         description: Favorite status retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         isFavorite:
+ *                           type: boolean
+ *                         favoriteId:
+ *                           type: string
+ *                           nullable: true
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Property not found
+ */
 router.get('/status/:propertyId', favoriteController.getFavoriteStatus);
 
 // Get favorite status for multiple properties (batch)
@@ -36,7 +171,42 @@ router.get('/unavailable', favoriteController.getUnavailableFavorites);
 // Check and notify about unavailable favorites
 router.post('/check-unavailable', favoriteController.checkUnavailableFavorites);
 
-// Remove property from favorites by property ID
+/**
+ * @swagger
+ * /api/favorites/property/{propertyId}:
+ *   delete:
+ *     summary: Remove property from favorites
+ *     tags: [Favorites]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: propertyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Property ID to remove from favorites
+ *     responses:
+ *       200:
+ *         description: Property removed from favorites successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         message:
+ *                           type: string
+ *                           example: "Property removed from favorites"
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Property not found in favorites
+ */
 router.delete('/property/:propertyId', favoriteController.removeFromFavorites);
 
 // Remove favorite by favorite ID
