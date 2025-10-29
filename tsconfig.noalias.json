@@ -14,7 +14,6 @@
     "checkJs": false,
     "noEmit": false,
     "noEmitOnError": false,
-
     "allowUnreachableCode": true,
     "allowUnusedLabels": true,
     "noImplicitAny": false,
@@ -28,19 +27,7 @@
     "noUncheckedIndexedAccess": false,
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "baseUrl": "./",
-    "paths": {
-      "@/*": ["src/*"],
-      "@/controllers/*": ["src/controllers/*"],
-      "@/services/*": ["src/services/*"],
-      "@/repositories/*": ["src/repositories/*"],
-      "@/middleware/*": ["src/middleware/*"],
-      "@/routes/*": ["src/routes/*"],
-      "@/utils/*": ["src/utils/*"],
-      "@/config/*": ["src/config/*"],
-      "@/types/*": ["src/types/*"]
-    }
+    "emitDecoratorMetadata": true
   },
   "include": ["src/**/*"],
   "exclude": [

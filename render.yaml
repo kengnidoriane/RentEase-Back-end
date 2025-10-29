@@ -3,7 +3,7 @@ services:
     name: rentease-backend
     env: node
     plan: free
-    buildCommand: npm run build:render
+    buildCommand: npm run build:production
     startCommand: npm start
     envVars:
       - key: NODE_ENV

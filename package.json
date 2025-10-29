@@ -6,7 +6,9 @@
   "scripts": {
     "build": "tsc --project tsconfig.build.json --noEmitOnError false || echo 'Build completed with warnings'",
     "build:force": "tsc --project tsconfig.render.json || tsc --project tsconfig.build.json --skipLibCheck --noEmitOnError false || echo 'Force build completed'",
-    "build:render": "tsc --project tsconfig.render.json",
+    "build:render": "tsc --project tsconfig.render.json && node scripts/fix-imports.js",
+    "build:simple": "tsc --project tsconfig.noalias.json",
+    "build:production": "node scripts/build-production.js",
     "start": "node scripts/start-production.js",
     "start:simple": "node dist/server.js",
     "start:with-migrations": "npx prisma migrate deploy && npx prisma generate && node dist/server.js",
