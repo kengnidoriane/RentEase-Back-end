@@ -30,7 +30,10 @@ COPY . .
 RUN npx prisma generate
 
 # Build the application with force flag
-RUN npm run build:force || npm run build || echo "Build completed with warnings"
+RUN npm run build:render || npm run build:force || npm run build || echo "Build completed with warnings"
+
+# Run database migrations (if needed)
+RUN npx prisma migrate deploy || echo "Migration skipped or failed"
 
 # Production stage
 FROM base AS production

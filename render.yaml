@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: rentease-backend
+    env: node
+    plan: free
+    buildCommand: npm run build:render
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+    healthCheckPath: /health
+    autoDeploy: true
+    preDeployCommand: npx prisma migrate deploy && npx prisma generate
