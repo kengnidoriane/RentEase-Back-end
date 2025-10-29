@@ -10,17 +10,23 @@ function fixImportsInFile(filePath) {
     let content = fs.readFileSync(filePath, 'utf8');
     let modified = false;
 
-    // Replace @/ imports with relative paths
+    // Get the directory of the current file to calculate relative paths
+    const fileDir = path.dirname(filePath);
+    const distDir = path.join(process.cwd(), 'dist');
+    const relativeFromDist = path.relative(fileDir, distDir);
+
+    // Replace @/ imports with correct relative paths
     const replacements = [
-      { from: /require\(['"]@\/config\/([^'"]+)['"]\)/g, to: "require('./config/$1')" },
-      { from: /require\(['"]@\/utils\/([^'"]+)['"]\)/g, to: "require('./utils/$1')" },
-      { from: /require\(['"]@\/services\/([^'"]+)['"]\)/g, to: "require('./services/$1')" },
-      { from: /require\(['"]@\/middleware\/([^'"]+)['"]\)/g, to: "require('./middleware/$1')" },
-      { from: /require\(['"]@\/controllers\/([^'"]+)['"]\)/g, to: "require('./controllers/$1')" },
-      { from: /require\(['"]@\/routes\/([^'"]+)['"]\)/g, to: "require('./routes/$1')" },
-      { from: /require\(['"]@\/repositories\/([^'"]+)['"]\)/g, to: "require('./repositories/$1')" },
-      { from: /require\(['"]@\/types\/([^'"]+)['"]\)/g, to: "require('./types/$1')" },
-      { from: /require\(['"]@\/([^'"]+)['"]\)/g, to: "require('./$1')" }
+      // Direct @/ imports
+      { from: /require\(['"]@\/config\/([^'"]+)['"]\)/g, to: (match, p1) => `require('${path.posix.join(relativeFromDist, 'config', p1)}')` },
+      { from: /require\(['"]@\/utils\/([^'"]+)['"]\)/g, to: (match, p1) => `require('${path.posix.join(relativeFromDist, 'utils', p1)}')` },
+      { from: /require\(['"]@\/services\/([^'"]+)['"]\)/g, to: (match, p1) => `require('${path.posix.join(relativeFromDist, 'services', p1)}')` },
+      { from: /require\(['"]@\/middleware\/([^'"]+)['"]\)/g, to: (match, p1) => `require('${path.posix.join(relativeFromDist, 'middleware', p1)}')` },
+      { from: /require\(['"]@\/controllers\/([^'"]+)['"]\)/g, to: (match, p1) => `require('${path.posix.join(relativeFromDist, 'controllers', p1)}')` },
+      { from: /require\(['"]@\/routes\/([^'"]+)['"]\)/g, to: (match, p1) => `require('${path.posix.join(relativeFromDist, 'routes', p1)}')` },
+      { from: /require\(['"]@\/repositories\/([^'"]+)['"]\)/g, to: (match, p1) => `require('${path.posix.join(relativeFromDist, 'repositories', p1)}')` },
+      { from: /require\(['"]@\/types\/([^'"]+)['"]\)/g, to: (match, p1) => `require('${path.posix.join(relativeFromDist, 'types', p1)}')` },
+      { from: /require\(['"]@\/([^'"]+)['"]\)/g, to: (match, p1) => `require('${path.posix.join(relativeFromDist, p1)}')` }
     ];
 
     replacements.forEach(({ from, to }) => {
@@ -29,6 +35,10 @@ function fixImportsInFile(filePath) {
         modified = true;
       }
     });
+
+    // Fix any remaining relative path issues
+    content = content.replace(/require\(['"]\.\.\/\.\.\//g, "require('../");
+    content = content.replace(/require\(['"]\.\/\.\.\//g, "require('../");
 
     if (modified) {
       fs.writeFileSync(filePath, content);

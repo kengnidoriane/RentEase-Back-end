@@ -9,6 +9,8 @@
     "build:render": "tsc --project tsconfig.render.json && node scripts/fix-imports.js",
     "build:simple": "tsc --project tsconfig.noalias.json",
     "build:production": "node scripts/build-production.js",
+    "build:simple": "node scripts/simple-build.js",
+    "build:ultimate": "node scripts/ultimate-build.js",
     "start": "node scripts/start-production.js",
     "start:simple": "node dist/server.js",
     "start:with-migrations": "npx prisma migrate deploy && npx prisma generate && node dist/server.js",
