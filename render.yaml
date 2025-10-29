@@ -10,6 +10,13 @@ services:
         value: production
       - key: PORT
         value: 3000
+      - key: DATABASE_URL
+        sync: false  # This will be set manually in Render dashboard
+      - key: REDIS_URL
+        sync: false  # This will be set manually in Render dashboard
+      - key: JWT_SECRET
+        sync: false  # This will be set manually in Render dashboard
+      - key: JWT_REFRESH_SECRET
+        sync: false  # This will be set manually in Render dashboard
     healthCheckPath: /health
     autoDeploy: true
-    preDeployCommand: npx prisma migrate deploy && npx prisma generate

@@ -32,8 +32,7 @@ RUN npx prisma generate
 # Build the application with force flag
 RUN npm run build:render || npm run build:force || npm run build || echo "Build completed with warnings"
 
-# Run database migrations (if needed)
-RUN npx prisma migrate deploy || echo "Migration skipped or failed"
+# Skip migrations in build stage - will be done at runtime
 
 # Production stage
 FROM base AS production
@@ -48,6 +47,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nodejs:nodejs /app/scripts ./scripts
 
 USER nodejs
 
